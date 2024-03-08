@@ -51,3 +51,6 @@ class Blockchain:
             the chain will always consist of at least one block (i.e., genesis block)
         """
         return self.chain[-1]
+
+
+#hahahahahahahah
