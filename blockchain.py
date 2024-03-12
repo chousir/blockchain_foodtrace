@@ -5,8 +5,10 @@ import atexit
 from hashlib import sha256
 import json
 import time
+import base64
+import ecdsa
 
-from flask import Flask, request
+from flask import Flask, request, redirect, url_for
 import requests
 
 
@@ -140,6 +142,28 @@ class Blockchain:
 
         return True
 
+    # # Register a Food Supply Chain Participant
+    # def registration(self, transaction):
+    #     validation = self.validate_registration()
+    #     if validation:
+    #         values = []
+    #         values.append({
+    #             'Food Supply Chain Participant': transaction['Participant'],
+    #             'Account': transaction['Account'],  # publickey
+    #             'Industry': transaction['Industry'],
+    #         })
+    #         return self.add_new_transaction(values)
+    #     else:
+    #         return validation
+    
+    # def validate_registration(self, public_key, message, signature):
+    #     public_key = (base64.b64decode(public_key)).hex()
+    #     signature = base64.b64decode(signature)
+    #     vk = ecdsa.VerifyingKey.from_string(bytes.fromhex(public_key), curve=ecdsa.SECP256k1)
+    #     try:
+    #         return vk.verify(signature, message.encode())
+    #     except:
+    #         return False
 
 app = Flask(__name__)
 
@@ -360,6 +384,3 @@ def announce_new_block(block):
         requests.post(url,
                       data=json.dumps(block.__dict__, sort_keys=True),
                       headers=headers)
-
-# Uncomment this line if you want to specify the port number in the code
-#app.run(debug=True, port=8000)
