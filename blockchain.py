@@ -142,28 +142,32 @@ class Blockchain:
 
         return True
 
-    # # Register a Food Supply Chain Participant
-    # def registration(self, transaction):
-    #     validation = self.validate_registration()
-    #     if validation:
-    #         values = []
-    #         values.append({
-    #             'Food Supply Chain Participant': transaction['Participant'],
-    #             'Account': transaction['Account'],  # publickey
-    #             'Industry': transaction['Industry'],
-    #         })
-    #         return self.add_new_transaction(values)
-    #     else:
-    #         return validation
-    
-    # def validate_registration(self, public_key, message, signature):
-    #     public_key = (base64.b64decode(public_key)).hex()
-    #     signature = base64.b64decode(signature)
-    #     vk = ecdsa.VerifyingKey.from_string(bytes.fromhex(public_key), curve=ecdsa.SECP256k1)
-    #     try:
-    #         return vk.verify(signature, message.encode())
-    #     except:
-    #         return False
+    # Register a Food Supply Chain Participant
+    def registration(self, transaction):
+        validation = self.validate_registration(
+            public_key=transaction['Account'], 
+            message=transaction['message'], 
+            signature=transaction['signature'],
+            )
+        if validation:
+            values = []
+            values.append({
+                'Food Supply Chain Participant': transaction['Participant'],
+                'Account': transaction['Account'],  # publickey
+                'Industry': transaction['Industry'],
+            })
+            return self.add_new_transaction(values)
+        else:
+            return validation
+
+    def validate_registration(self, public_key, message, signature):
+        public_key = (base64.b64decode(public_key)).hex()
+        signature = base64.b64decode(signature)
+        vk = ecdsa.VerifyingKey.from_string(bytes.fromhex(public_key), curve=ecdsa.SECP256k1)
+        try:
+            return vk.verify(signature, message.encode())
+        except:
+            return False
 
 app = Flask(__name__)
 
@@ -193,6 +197,23 @@ def new_transaction():
 
 
 chain_file_name = os.environ.get('DATA_FILE')
+
+
+# Register a Food Supply Chain Participant
+@app.route('/register', methods=['POST'])
+def register():
+    tx_data = request.get_json()
+    required_fields = ['Participant', 'Industry', 'Account', 'message', 'signature']
+
+    for field in required_fields:
+        if not tx_data.get(field):
+            return "Invalid transaction data", 404
+    
+    tx_data["timestamp"] = time.time()
+
+    blockchain.registration(transaction=tx_data)
+
+    return "Success", 201
 
 
 def create_chain_from_dump(chain_dump):
