@@ -143,8 +143,8 @@ class Blockchain:
         return True
 
     # Register a Food Supply Chain Participant
-    def registration(self, transaction):
-        validation = self.validate_registration(
+    def participant_registration(self, transaction):
+        validation = self.validate_participant_registration(
             public_key=transaction['Account'], 
             message=transaction['message'], 
             signature=transaction['signature'],
@@ -159,8 +159,8 @@ class Blockchain:
             return self.add_new_transaction(values)
         else:
             return validation
-
-    def validate_registration(self, public_key, message, signature):
+    # Check if Account is avaliable
+    def validate_participant_registration(self, public_key, message, signature):
         public_key = (base64.b64decode(public_key)).hex()
         signature = base64.b64decode(signature)
         vk = ecdsa.VerifyingKey.from_string(bytes.fromhex(public_key), curve=ecdsa.SECP256k1)
@@ -168,6 +168,36 @@ class Blockchain:
             return vk.verify(signature, message.encode())
         except:
             return False
+
+    # Food Supply Chain Participant Register a Pruoduct
+    def pruoduct_registration(self, transaction):
+        validation, OwnerName = self.validate_pruoduct_registration(
+            public_key=transaction['Owner ID'], 
+            message=transaction['message'], 
+            signature=transaction['signature'],
+            )
+        if validation:
+            values = []
+            values.append({
+                'Owner Name': OwnerName,
+                'Owner ID': transaction['Owner ID'],  # publickey
+                'Product Name': transaction['Product Name'],
+                'Description': transaction['Description'],
+                'Item Weight': transaction['Item Weight'],
+                'Expiry Date': transaction['Expiry Date'],
+            })
+            return self.add_new_transaction(values)
+        else:
+            return validation
+
+    def validate_pruoduct_registration(self, public_key, message, signature):
+        for block in self.chain:
+            for transactions in block.__dict__["transactions"]:
+                for transaction in transactions:
+                    if public_key in transaction['Account']:
+                        return self.validate_participant_registration(public_key, message, signature), transaction['Food Supply Chain Participant']
+                    else:
+                        return False
 
 app = Flask(__name__)
 
@@ -200,8 +230,8 @@ chain_file_name = os.environ.get('DATA_FILE')
 
 
 # Register a Food Supply Chain Participant
-@app.route('/register', methods=['POST'])
-def register():
+@app.route('/register_participant', methods=['POST'])
+def register_participant():
     tx_data = request.get_json()
     required_fields = ['Participant', 'Industry', 'Account', 'message', 'signature']
 
@@ -211,10 +241,25 @@ def register():
     
     tx_data["timestamp"] = time.time()
 
-    blockchain.registration(transaction=tx_data)
+    blockchain.participant_registration(transaction=tx_data)
 
     return "Success", 201
 
+# Register a Product
+@app.route('/register_product', methods=['POST'])
+def register_product():
+    tx_data = request.get_json()
+    required_fields = ['Owner ID', 'Product Name', 'Description', 'Item Weight', 'Expiry Date', 'message', 'signature']
+
+    for field in required_fields:
+        if not tx_data.get(field):
+            return "Invalid transaction data", 404
+    
+    tx_data["timestamp"] = time.time()
+
+    blockchain.pruoduct_registration(transaction=tx_data)
+
+    return "Success", 201
 
 def create_chain_from_dump(chain_dump):
     generated_blockchain = Blockchain()

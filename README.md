@@ -34,10 +34,10 @@ Signature Validation: Success
 
 ### Client register account
 
-Account is Public Key
+'Account' is Public Key
 ```sh
 curl -X POST \
-  http://127.0.0.1:8000/register \
+  http://127.0.0.1:8000/register_participant \
   -H 'Content-Type: application/json' \
   -d '{"Participant": "GreenHarvest Farms", "Industry": "Agriculture", "Account": "FXAIbYvbUzkjSyabFYOvGbrUb9UvT8moBgOrzYwo57qs8/8kD99IyUER+MP7jr7R3d2xLHRqFl2OEUUsLo/oEg==", "message": "1710260241", "signature": "AlbSt6B6R7l22kJzEk623NI8tsVe3yyllax1NIHEE7QhLRBHwbNWoP4QtlfsRRqCd1l9qYNiBhNijQjQ2qxQ2g=="}'
 ```
@@ -48,6 +48,17 @@ curl -X GET http://localhost:8000/mine
 
 ```sh
 curl -X GET http://localhost:8000/chain
+```
+
+### Pruoduct register
+
+['Owner ID', 'Product Name', 'Description', 'Item Weight', 'Expiry Date']
+'Owner ID' is Public Key
+```sh
+curl -X POST \
+  http://127.0.0.1:8000/register_product \
+  -H 'Content-Type: application/json' \
+  -d '{"Owner ID": "FXAIbYvbUzkjSyabFYOvGbrUb9UvT8moBgOrzYwo57qs8/8kD99IyUER+MP7jr7R3d2xLHRqFl2OEUUsLo/oEg==", "Product Name": "Green Pepper", "Description": "Not good", "Item Weight": "50 KG", "Expiry Date": "1 years", "message": "1710260241", "signature": "AlbSt6B6R7l22kJzEk623NI8tsVe3yyllax1NIHEE7QhLRBHwbNWoP4QtlfsRRqCd1l9qYNiBhNijQjQ2qxQ2g=="}'
 ```
 
 
