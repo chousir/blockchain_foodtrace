@@ -8,6 +8,7 @@ import time
 import base64
 import ecdsa
 
+from datetime import datetime, timedelta
 from flask import Flask, request, redirect, url_for
 import requests
 
@@ -155,6 +156,7 @@ class Blockchain:
                 'Food Supply Chain Participant': transaction['Participant'],
                 'Account': transaction['Account'],  # publickey
                 'Industry': transaction['Industry'],
+                'Action': 'Participant Registration',
             })
             return self.add_new_transaction(values)
         else:
@@ -170,34 +172,48 @@ class Blockchain:
             return False
 
     # Food Supply Chain Participant Register a Pruoduct
-    def pruoduct_registration(self, transaction):
-        validation, OwnerName = self.validate_pruoduct_registration(
+    def product_registration(self, transaction):
+        validation, OwnerName = self.validate_product_registration(
             public_key=transaction['Owner ID'], 
             message=transaction['message'], 
             signature=transaction['signature'],
             )
         if validation:
             values = []
+            ProductID = transaction['Owner ID'] + transaction['Product Name'] + transaction['Expiry Date']
+            ProductID = sha256(ProductID.encode()).hexdigest()
             values.append({
                 'Owner Name': OwnerName,
                 'Owner ID': transaction['Owner ID'],  # publickey
                 'Product Name': transaction['Product Name'],
+                'Product ID': ProductID,
                 'Description': transaction['Description'],
                 'Item Weight': transaction['Item Weight'],
-                'Expiry Date': transaction['Expiry Date'],
+                'Expiry Date': self.ExpiryDateCaculate(transaction['Expiry Date']), # Only days
             })
             return self.add_new_transaction(values)
         else:
             return validation
 
-    def validate_pruoduct_registration(self, public_key, message, signature):
+    def validate_product_registration(self, public_key, message, signature):
         for block in self.chain:
             for transactions in block.__dict__["transactions"]:
                 for transaction in transactions:
-                    if public_key in transaction['Account']:
-                        return self.validate_participant_registration(public_key, message, signature), transaction['Food Supply Chain Participant']
+                    if transaction['Action'] == 'Participant Registration':
+                        if public_key in transaction['Account']:
+                            return self.validate_participant_registration(public_key, message, signature), transaction['Food Supply Chain Participant']
+                        else:
+                            pass
                     else:
-                        return False
+                        pass
+                return False
+
+    def ExpiryDateCaculate(self, days):
+        current_time = datetime.now()
+        new_time = current_time + timedelta(days=365)
+        new_time = new_time.timestamp()
+
+        return new_time
 
 app = Flask(__name__)
 
@@ -257,7 +273,7 @@ def register_product():
     
     tx_data["timestamp"] = time.time()
 
-    blockchain.pruoduct_registration(transaction=tx_data)
+    blockchain.product_registration(transaction=tx_data)
 
     return "Success", 201
 
