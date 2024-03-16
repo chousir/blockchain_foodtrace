@@ -9,7 +9,7 @@ import base64
 import ecdsa
 
 from datetime import datetime, timedelta
-from flask import Flask, request, redirect, url_for
+from flask import Flask, request
 import requests
 
 
@@ -145,7 +145,7 @@ class Blockchain:
 
     # Register a Food Supply Chain Participant
     def participant_registration(self, transaction):
-        validation = self.validate_participant_registration(
+        validation = self.validate_signature(
             public_key=transaction['Account'], 
             message=transaction['message'], 
             signature=transaction['signature'],
@@ -161,8 +161,78 @@ class Blockchain:
             return self.add_new_transaction(values)
         else:
             return validation
+
+    # Food Supply Chain Participant Register a Product
+    def product_registration(self, transaction):
+        pvalidation, OwnerName = self.validate_participant(
+            public_key=transaction['Owner ID'], 
+            message=transaction['message'], 
+            signature=transaction['signature'],
+            )
+        if transaction['Ingredients'] != []:
+            ivalidation = []
+            for ingredient in transaction['Ingredients']:
+                ivalidation.append(self.validate_product(ingredient))
+        else:
+            ivalidation = []
+        if pvalidation and False not in ivalidation:
+            values = []
+            ExpiryDate = self.ExpiryDateCaculate(transaction['Expiry Date'])
+            ProductID = transaction['Owner ID'] + transaction['Product Name'] + str(ExpiryDate)
+            ProductID = sha256(ProductID.encode()).hexdigest()
+            values.append({
+                'Owner Name': OwnerName,
+                'Owner ID': transaction['Owner ID'],  # publickey
+                'Product Name': transaction['Product Name'],
+                'Product ID': ProductID,
+                'Action': 'Product Registration',
+                'Description': transaction['Description'],
+                'Ingredients': transaction['Ingredients'],
+                'Item Weight': transaction['Item Weight'],
+                'Expiry Date': ExpiryDate, # Only days
+            })
+            return self.add_new_transaction(values)
+        else:
+            return pvalidation, ivalidation
+
+    # Food Supply Chain Participant Register a Pruoduct
+    def product_transfer(self, transaction):
+        Ovalidation, OwnerName = self.validate_participant(
+            public_key=transaction['Owner ID'], 
+            message=transaction['message'], 
+            signature=transaction['signature'],
+            )
+        Rvalidation, ReceiverName = self.validate_participant(
+            public_key=transaction['Receiver ID'], 
+            message=transaction['message'], 
+            signature=transaction['signature'],
+            )
+        if transaction['Ingredients'] != []:
+            ivalidation = []
+            for ingredient in transaction['Ingredients']:
+                ivalidation.append(self.validate_product(ingredient))
+        else:
+            ivalidation = []
+        if Ovalidation and Rvalidation and ivalidation:
+            values = []
+            values.append({
+                'Owner Name': OwnerName,
+                'Owner ID': transaction['Owner ID'],  # publickey
+                'Receiver Name': ReceiverName,
+                'Receiver ID':transaction['Receiver ID'],
+                'Product Name': transaction['Product Name'],
+                'Product ID': transaction['Product ID'],
+                'Action': 'Product Transfer',
+                'Description': transaction['Description'],
+                'Item Weight': transaction['Item Weight'],
+                'Expiry': self.ExpiryDateCaculate(transaction['Expiry Date']), # Only days
+            })
+            return self.add_new_transaction(values)
+        else:
+            return Ovalidation, Rvalidation
+
     # Check if Account is avaliable
-    def validate_participant_registration(self, public_key, message, signature):
+    def validate_signature(self, public_key, message, signature):
         public_key = (base64.b64decode(public_key)).hex()
         signature = base64.b64decode(signature)
         vk = ecdsa.VerifyingKey.from_string(bytes.fromhex(public_key), curve=ecdsa.SECP256k1)
@@ -171,43 +241,56 @@ class Blockchain:
         except:
             return False
 
-    # Food Supply Chain Participant Register a Pruoduct
-    def product_registration(self, transaction):
-        validation, OwnerName = self.validate_product_registration(
-            public_key=transaction['Owner ID'], 
-            message=transaction['message'], 
-            signature=transaction['signature'],
-            )
-        if validation:
-            values = []
-            ProductID = transaction['Owner ID'] + transaction['Product Name'] + transaction['Expiry Date']
-            ProductID = sha256(ProductID.encode()).hexdigest()
-            values.append({
-                'Owner Name': OwnerName,
-                'Owner ID': transaction['Owner ID'],  # publickey
-                'Product Name': transaction['Product Name'],
-                'Product ID': ProductID,
-                'Description': transaction['Description'],
-                'Item Weight': transaction['Item Weight'],
-                'Expiry Date': self.ExpiryDateCaculate(transaction['Expiry Date']), # Only days
-            })
-            return self.add_new_transaction(values)
-        else:
-            return validation
-
-    def validate_product_registration(self, public_key, message, signature):
+    # validate participant by public_key(Account), message, signature
+    def validate_participant(self, public_key, message, signature):
         for block in self.chain:
             for transactions in block.__dict__["transactions"]:
                 for transaction in transactions:
                     if transaction['Action'] == 'Participant Registration':
-                        if public_key in transaction['Account']:
-                            return self.validate_participant_registration(public_key, message, signature), transaction['Food Supply Chain Participant']
+                        if public_key == transaction['Account']:
+                            return self.validate_signature(public_key, message, signature), transaction['Food Supply Chain Participant']
                         else:
                             pass
                     else:
                         pass
-                return False
+        return False    # Don't find Account
 
+    # validate product by ProductID
+    def validate_product(self, ProductID):
+        for block in self.chain:
+            for transactions in block.__dict__["transactions"]:
+                for transaction in transactions:
+                    if transaction['Action'] == 'Product Registration':
+                        if ProductID == transaction['Product ID']:
+                            return ProductID
+                        else:
+                            pass
+                    else:
+                        pass
+        return False    # Don't find ProductID
+
+    # search product_registration block by OwnerName, ProductName, ProductID
+    def search_product(self, OwnerName=None, ProductName=None, ProductID=None):
+        if OwnerName is None and ProductName is None and ProductID is None:
+            print("No search criteria provided.")
+            return None
+        result = []
+        for block in self.chain:
+            for transactions in block.__dict__["transactions"]:
+                for transaction in transactions:
+                    if transaction['Action'] == 'Product Registration':
+                        match_OwnerName = OwnerName is None or transaction['Owner Name'] == OwnerName
+                        match_ProductName = ProductName is None or transaction['Product Name'] == ProductName
+                        match_ProductID = ProductID is None or transaction['Product ID'] == ProductID
+
+                        if match_OwnerName and match_ProductName and match_ProductID:
+                            result.append(transaction)
+                            return result
+                    else:
+                        pass
+        return False    # Don't find transaction
+    
+    # Other functions
     def ExpiryDateCaculate(self, days):
         current_time = datetime.now()
         new_time = current_time + timedelta(days=365)
@@ -265,7 +348,7 @@ def register_participant():
 @app.route('/register_product', methods=['POST'])
 def register_product():
     tx_data = request.get_json()
-    required_fields = ['Owner ID', 'Product Name', 'Description', 'Item Weight', 'Expiry Date', 'message', 'signature']
+    required_fields = ['Owner ID', 'Product Name', 'Description', 'Item Weight', 'Expiry Date', 'Ingredients', 'message', 'signature']
 
     for field in required_fields:
         if not tx_data.get(field):
